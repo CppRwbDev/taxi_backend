@@ -48,6 +48,7 @@ async def validate_and_login(payload: ValidateRequest, db: AsyncSession = Depend
             username=tg_user.get("username"),
             photo_url=tg_user.get("photo_url"),
             role="passenger",  # Default rol, onboarding da o'zgartiriladi
+            balance=10000.0, # Test uchun bonus
         )
         db.add(user)
     else:

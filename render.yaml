@@ -1,0 +1,61 @@
+services:
+  - type: web
+    name: taxi-backend
+    env: python
+    region: frankfurt # Yevropa serveri tezroq ishlaydi
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: BOT_TOKEN
+        value: placeholder_tugri_qiling
+      - key: DRIVERS_GROUP_ID
+        value: "0" # Haydovchilar guruhi IDsi, alishtiring
+      - key: DATABASE_URL
+        value: postgresql+asyncpg://user:pass@ep-xxx.neon.tech/neondb?sslmode=require
+      - key: BACKEND_URL
+        value: https://taxi-backend.onrender.com
+      - key: FRONTEND_URL
+        value: https://taxi-frontend.onrender.com
+      - key: SECRET_KEY
+        generateValue: true # Render o'zi random secret generatsiya qiladi
+      # Komissiya narxlari
+      - key: COMMISSION_1_PAX
+        value: "5000"
+      - key: COMMISSION_2_PAX
+        value: "8000"
+      - key: COMMISSION_3_PAX
+        value: "12000"
+      - key: COMMISSION_4_PAX
+        value: "15000"
+      - key: COMMISSION_5_PLUS_PAX
+        value: "25000"
+      # Admin Akkauntlar
+      - key: ADMIN1_USERNAME
+        value: admin1
+      - key: ADMIN1_PASSWORD_HASH
+        value: "$2b$12$changethis_admin1_bcrypt_hash"
+      - key: ADMIN2_USERNAME
+        value: admin2
+      - key: ADMIN2_PASSWORD_HASH
+        value: "$2b$12$changethis_admin2_bcrypt_hash"
+      - key: ADMIN_JWT_SECRET
+        generateValue: true
+      - key: ADMIN_JWT_EXPIRE_MINUTES
+        value: "480"
+      # Dev Akkauntlar
+      - key: DEV1_USERNAME
+        value: dev1
+      - key: DEV1_PASSWORD_HASH
+        value: "$2b$12$changethis_dev1_bcrypt_hash"
+      - key: DEV2_USERNAME
+        value: dev2
+      - key: DEV2_PASSWORD_HASH
+        value: "$2b$12$changethis_dev2_bcrypt_hash"
+      - key: DEV_JWT_SECRET
+        generateValue: true
+      - key: DEV_JWT_EXPIRE_MINUTES
+        value: "240"
+      # Logging
+      - key: LOG_LEVEL
+        value: INFO

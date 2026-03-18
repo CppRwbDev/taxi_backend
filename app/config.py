@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 
+from pydantic import field_validator
+
 class Settings(BaseSettings):
     # --- Telegram ---
     BOT_TOKEN: str = ""
@@ -9,6 +11,17 @@ class Settings(BaseSettings):
 
     # --- Database ---
     DATABASE_URL: str = ""
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def assemble_db_connection(cls, v: str) -> str:
+        if v:
+            if v.startswith("postgresql://"):
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            v = v.replace("sslmode=require", "ssl=require")
+            v = v.replace("&channel_binding=require", "")
+            v = v.replace("?channel_binding=require", "")
+        return v
 
     # --- Backend ---
     BACKEND_URL: str = "http://localhost:8000"

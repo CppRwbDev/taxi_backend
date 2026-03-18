@@ -13,6 +13,8 @@ services:
         value: "0" # Haydovchilar guruhi IDsi, alishtiring
       - key: DATABASE_URL
         value: postgresql+asyncpg://user:pass@ep-xxx.neon.tech/neondb?sslmode=require
+      - key: PYTHON_VERSION
+        value: "3.12.2"
       - key: BACKEND_URL
         value: https://taxi-backend.onrender.com
       - key: FRONTEND_URL

@@ -27,6 +27,7 @@ class UserUpdate(BaseModel):
     car_model: Optional[str] = None
     car_number: Optional[str] = None
     car_color: Optional[str] = None
+    working_cities: Optional[str] = None
 
 
 class UserOut(UserBase):
@@ -39,6 +40,7 @@ class UserOut(UserBase):
     car_model: Optional[str] = None
     car_number: Optional[str] = None
     car_color: Optional[str] = None
+    working_cities: Optional[str] = None
     created_at: datetime
 
     class Config:

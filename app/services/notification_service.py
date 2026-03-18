@@ -142,3 +142,61 @@ async def notify_match(order, driver, passenger):
         logger.error("Match notification xatosi: %s", e)
     finally:
         await bot.session.close()
+
+
+async def notify_drivers_personally(order):
+    """
+    Yangi buyurtma haqida mos keluvchi hudud haydovchilariga shaxsiy xabar yuborish.
+    """
+    if not settings.BOT_TOKEN:
+        return
+
+    bot = await get_bot()
+    if not bot:
+        return
+
+    from sqlalchemy import select, or_
+    from app.database import get_session_factory
+    from app.models.user import User
+
+    session_maker = get_session_factory()
+    async with session_maker() as session:
+        # Hududi mos va aktiv haydovchilarni qidirish
+        # working_cities "Toshkent,Andijon" ko'rinishida, shuning uchun LIKE operatoridan foydalanamiz
+        search_from = f"%{order.from_location}%"
+        search_to = f"%{order.to_location}%"
+        
+        result = await session.execute(
+            select(User)
+            .where(
+                User.role.in_(["driver", "investor"]),
+                User.is_active == True,
+                or_(
+                    User.working_cities.ilike(search_from),
+                    User.working_cities.ilike(search_to)
+                )
+            )
+        )
+        drivers = result.scalars().all()
+
+    if not drivers:
+        await bot.session.close()
+        return
+
+    text = (
+        f"🔔 <b>Sizning hududingizda yangi buyurtma!</b>\n\n"
+        f"📍 {order.from_location} → {order.to_location}\n"
+        f"📅 {order.departure_date or 'Bugun'}\n"
+        f"⏰ {order.departure_time or 'Hozir'}\n"
+        f"👥 {order.passenger_count} yo'lovchi"
+    )
+
+    for driver in drivers:
+        if not driver.telegram_id:
+            continue
+        try:
+            await bot.send_message(driver.telegram_id, text, parse_mode="HTML")
+        except Exception as e:
+            logger.warning("Driver serial notification error for user %s: %s", driver.id, e)
+
+    await bot.session.close()

@@ -44,10 +44,12 @@ async def create_order(
 
     logger.info("Yangi buyurtma: id=%s %s→%s", order.id, order.from_location, order.to_location)
 
-    # Bot orqali haydovchilar guruhiga yuborish (Task 4.2 — bot integratsiya)
+    # Bot orqali haydovchilar guruhiga va shaxsan yuborish
     try:
-        from app.services.notification_service import notify_drivers_group
+        from app.services.notification_service import notify_drivers_group, notify_drivers_personally
         await notify_drivers_group(order, current_user)
+        # Hududi mos haydovchilarga shaxsan ham yuboramiz
+        await notify_drivers_personally(order)
     except Exception as e:
         logger.warning("Bot notification xatosi: %s", e)
         # Buyurtma baribir saqlanadi, bot xatosi kritik emas

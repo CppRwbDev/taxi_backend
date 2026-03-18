@@ -28,6 +28,7 @@ class User(Base):
     car_color = Column(String(50))
     is_verified = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
+    working_cities = Column(String(500))  # Comma separated e.g. "Toshkent,Andijon"
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

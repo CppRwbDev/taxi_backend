@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     # --- Telegram ---
     BOT_TOKEN: str = ""
     DRIVERS_GROUP_ID: int = 0
+    ADMIN_TELEGRAM_IDS: str = "" # Comma separated: 123456,7891011
 
     # --- Database ---
     DATABASE_URL: str = ""

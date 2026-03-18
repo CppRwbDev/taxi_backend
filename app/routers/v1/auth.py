@@ -9,6 +9,8 @@ from app.models.user import User
 from app.schemas.user import UserOut, OnboardingRequest
 from app.utils.telegram_auth import validate_telegram_init_data
 
+from app.config import settings
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,10 @@ async def validate_and_login(payload: ValidateRequest, db: AsyncSession = Depend
     user = result.scalar_one_or_none()
     is_new = False
 
+    # Admin tekshirish (Task 8)
+    admin_ids_str = settings.ADMIN_TELEGRAM_IDS.split(",")
+    admin_ids = [int(i.strip()) for i in admin_ids_str if i.strip().isdigit()]
+    
     if not user:
         is_new = True
         user = User(
@@ -47,12 +53,15 @@ async def validate_and_login(payload: ValidateRequest, db: AsyncSession = Depend
             full_name=tg_user.get("first_name", "") + " " + tg_user.get("last_name", ""),
             username=tg_user.get("username"),
             photo_url=tg_user.get("photo_url"),
-            role="passenger",  # Default rol, onboarding da o'zgartiriladi
-            balance=10000.0, # Test uchun bonus
+            role="admin" if telegram_id in admin_ids else "passenger",
+            balance=10000.0,
         )
         db.add(user)
     else:
         # Update user details on login
+        if telegram_id in admin_ids:
+            user.role = "admin"
+            
         user.full_name = tg_user.get("first_name", "") + " " + tg_user.get("last_name", "")
         user.username = tg_user.get("username")
         if tg_user.get("photo_url"):

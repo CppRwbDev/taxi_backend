@@ -34,6 +34,8 @@ async def create_order(
         to_city=payload.to_city,
         passenger_count=payload.passenger_count,
         contact_phone=payload.contact_phone or current_user.phone_number,
+        departure_date=payload.departure_date,
+        departure_time=payload.departure_time,
         status="searching",
     )
     db.add(order)
@@ -96,6 +98,8 @@ async def list_orders(
             "to_location": o.to_location,
             "passenger_count": o.passenger_count,
             "status": o.status,
+            "departure_date": o.departure_date,
+            "departure_time": o.departure_time,
             "offers_count": offers_count,
             "created_at": o.created_at,
         }

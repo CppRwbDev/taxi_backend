@@ -21,6 +21,10 @@ class Order(Base):
 
     passenger_count = Column(SmallInteger, default=1)
     contact_phone = Column(String(20))
+    
+    departure_date = Column(String(50))                  # bugun | ertaga | 20-mar
+    departure_time = Column(String(20))                  # 14:30
+
 
     status = Column(String(20), default="searching", index=True)
     # searching | has_offers | matched | completed | cancelled

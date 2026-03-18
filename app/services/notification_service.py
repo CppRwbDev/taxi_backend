@@ -33,8 +33,10 @@ async def notify_drivers_group(order, passenger):
     text = (
         f"🆕 <b>Yangi buyurtma!</b>\n\n"
         f"📍 <b>{order.from_location}</b> → <b>{order.to_location}</b>\n"
+        f"📅 Sana: <b>{order.departure_date or 'Bugun'}</b>\n"
+        f"⏰ Vaqt: <b>{order.departure_time or 'Hozir'}</b>\n"
         f"👥 {order.passenger_count} nafar\n"
-        f"📞 {order.contact_phone or 'Ko\\'rsatilmagan'}\n\n"
+        f"📞 {order.contact_phone or 'Noma`lum'}\n\n"
         f"💰 <i>Komissiya: {commission:,} UZS</i>"
     )
 

@@ -7,6 +7,7 @@ from decimal import Decimal
 class UserBase(BaseModel):
     full_name: Optional[str] = None
     username: Optional[str] = None
+    photo_url: Optional[str] = None
     phone_number: Optional[str] = None
     role: str = "passenger"
     language: str = "uz_latn"

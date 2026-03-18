@@ -14,6 +14,7 @@ class User(Base):
     telegram_id = Column(BigInteger, unique=True, nullable=False, index=True)
     full_name = Column(String(255))
     username = Column(String(100))                      # TG @username
+    photo_url = Column(String(500))                     # TG Profile picture URL
     phone_number = Column(String(20))
     role = Column(String(20), nullable=False)            # passenger | driver | investor
     language = Column(String(10), default="uz_latn")    # uz_latn | uz_cyrl

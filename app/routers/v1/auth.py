@@ -46,11 +46,19 @@ async def validate_and_login(payload: ValidateRequest, db: AsyncSession = Depend
             telegram_id=telegram_id,
             full_name=tg_user.get("first_name", "") + " " + tg_user.get("last_name", ""),
             username=tg_user.get("username"),
+            photo_url=tg_user.get("photo_url"),
             role="passenger",  # Default rol, onboarding da o'zgartiriladi
         )
         db.add(user)
-        await db.flush()
-        logger.info("Yangi foydalanuvchi: tg_id=%s", telegram_id)
+    else:
+        # Update user details on login
+        user.full_name = tg_user.get("first_name", "") + " " + tg_user.get("last_name", "")
+        user.username = tg_user.get("username")
+        if tg_user.get("photo_url"):
+            user.photo_url = tg_user.get("photo_url")
+
+    await db.flush()
+    await db.refresh(user)
 
     return {"user": user, "is_new": is_new}
 

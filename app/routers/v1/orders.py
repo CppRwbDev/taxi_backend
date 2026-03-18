@@ -38,6 +38,7 @@ async def create_order(
     )
     db.add(order)
     await db.flush()
+    await db.refresh(order)
 
     logger.info("Yangi buyurtma: id=%s %s→%s", order.id, order.from_location, order.to_location)
 

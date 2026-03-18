@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.utils.logger import setup_logging
 from app.middleware.logging_middleware import LoggingMiddleware
+from bot.main import start_bot, stop_bot
 
 # Loglashni ishga tushirish
 setup_logging()
@@ -18,8 +20,19 @@ async def lifespan(app: FastAPI):
     """Startup va Shutdown hodisalari."""
     logger.info("🚀 Viloyatlararo Taksi API ishga tushmoqda...")
     logger.info("Frontend URL: %s", settings.FRONTEND_URL)
+    
+    # Telegram botni fonda ishga tushirish
+    bot_task = asyncio.create_task(start_bot())
+    
     yield
+    
     logger.info("🛑 API to'xtatildi.")
+    bot_task.cancel()
+    try:
+        await bot_task
+    except asyncio.CancelledError:
+        pass
+    await stop_bot()
 
 
 app = FastAPI(

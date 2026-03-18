@@ -82,6 +82,7 @@ async def send_offer(
         order.status = "has_offers"
 
     await db.flush()
+    await db.refresh(offer)
     logger.info("Yangi taklif: offer_id=%s driver=%s order=%s", offer.id, current_user.id, order.id)
 
     # Yo'lovchiga notification (Task 7.2)

@@ -8,24 +8,26 @@ from bot.handlers import start, orders
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def main():
-    if not settings.BOT_TOKEN:
-        logger.error("BOT_TOKEN topilmadi! .env faylni tekshiring.")
-        return
+bot = Bot(token=settings.BOT_TOKEN) if settings.BOT_TOKEN else None
+dp = Dispatcher()
 
-    # Bot va Dispatcher obyektlari
-    bot = Bot(token=settings.BOT_TOKEN)
-    dp = Dispatcher()
-
-    # Handlersni registratsiya qilish
+if bot:
     dp.include_router(start.router)
     dp.include_router(orders.router)
 
+async def start_bot():
+    if not bot:
+        logger.error("BOT_TOKEN topilmadi! .env faylni tekshiring.")
+        return
     logger.info("Bot ishga tushmoqda...")
     try:
         await dp.start_polling(bot)
-    finally:
+    except Exception as e:
+        logger.error(f"Bot polling xatosi: {e}")
+
+async def stop_bot():
+    if bot:
         await bot.session.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(start_bot())

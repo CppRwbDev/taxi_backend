@@ -71,8 +71,18 @@ async def notify_passenger_new_offer(offer, order, driver):
     if not bot:
         return
 
-    # Yo'lovchi telegram_id ni olish kerak (DB dan)
-    # Bu yerda faqat order.passenger_id mavjud — alohida query kerak
+    from sqlalchemy import select
+    from app.database import get_session_factory
+    from app.models.user import User
+
+    session_maker = get_session_factory()
+    async with session_maker() as session:
+        result = await session.execute(select(User).where(User.id == order.passenger_id))
+        passenger = result.scalar_one_or_none()
+
+    if not passenger or not passenger.telegram_id:
+        await bot.session.close()
+        return
 
     text = (
         f"💬 <b>Yangi taklif keldi!</b>\n\n"
@@ -82,10 +92,14 @@ async def notify_passenger_new_offer(offer, order, driver):
         f"⏰ Joʻnash: {offer.proposed_time or 'Koʻrsatilmagan'}\n\n"
         f"📍 {order.from_location} → {order.to_location}"
     )
-    logger.info("Yo'lovchiga taklif notification (offer_id=%s)", offer.id)
-    # passenger telegram_id ni order.passenger relation dan olish kerak
-    # Hozircha placeholder — bot handler da to'ldiriladi
-    await bot.session.close()
+    
+    try:
+        await bot.send_message(passenger.telegram_id, text, parse_mode="HTML")
+        logger.info("Yo'lovchiga taklif notification (offer_id=%s, tg_id=%s)", offer.id, passenger.telegram_id)
+    except Exception as e:
+        logger.error("Yo'lovchiga xabar yuborishda xato: %s", e)
+    finally:
+        await bot.session.close()
 
 
 async def notify_match(order, driver, passenger):

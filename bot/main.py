@@ -2,7 +2,7 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from app.config import settings
-from bot.handlers import start
+from bot.handlers import start, orders
 
 # Logging sozlash
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +19,7 @@ async def main():
 
     # Handlersni registratsiya qilish
     dp.include_router(start.router)
+    dp.include_router(orders.router)
 
     logger.info("Bot ishga tushmoqda...")
     try:

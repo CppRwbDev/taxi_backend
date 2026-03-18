@@ -51,3 +51,4 @@ class OnboardingRequest(BaseModel):
     language: str = Field(..., pattern="^(uz_latn|uz_cyrl)$")
     theme: str = Field(..., pattern="^(dark|light)$")
     role: str = Field(..., pattern="^(passenger|driver|investor)$")
+    working_cities: Optional[str] = None

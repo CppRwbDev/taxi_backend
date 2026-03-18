@@ -93,6 +93,7 @@ async def complete_onboarding(
     user.language = payload.language
     user.theme = payload.theme
     user.role = payload.role
+    user.working_cities = payload.working_cities
     user.is_onboarded = True
     await db.flush()
     logger.info("Onboarding yakunlandi: user_id=%s role=%s", user.id, user.role)

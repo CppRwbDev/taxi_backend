@@ -7,6 +7,5 @@ __pycache__/
 env/
 .env
 .pytest_cache/
-alembic.ini
 logs/
 *.log

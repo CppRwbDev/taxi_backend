@@ -57,11 +57,20 @@ async def top_up_balance(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Task 6.1 — Balans to'ldirish.
-    MVP: admin manual top-up. Kelajakda Payme/Click webhook.
+    Task 6.1 — Balans to'ldirish (MVP: faqat admin manual).
+
+    Xavfsizlik: oddiy foydalanuvchi o'z balansini o'zgartira olmaydi
+    (haqiqiy to'lov integratsiyasi paytida bu endpoint webhook ga aylanadi).
     """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Balansni faqat admin to'ldiradi. To'lov integratsiyasi tez orada qo'shiladi.",
+        )
     if payload.amount <= 0:
         raise HTTPException(status_code=400, detail="Summa 0 dan katta bo'lishi kerak")
+    if payload.amount > Decimal("100000000"):
+        raise HTTPException(status_code=400, detail="Summa juda katta (cheklov: 100 000 000 UZS)")
 
     current_user.balance += payload.amount
     txn = Transaction(

@@ -29,6 +29,19 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     SECRET_KEY: str = "change-me"
 
+    # --- Auth xavfsizligi ---
+    # initData necha soniya yosh bo'lsa qabul qilinadi (replay himoyasi)
+    INITDATA_MAX_AGE_SECONDS: int = 86400
+
+    # --- Rate limiting (har bir IP uchun, daqiqaga) ---
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 120
+    RATE_LIMIT_AUTH_PER_MINUTE: int = 20
+
+    # --- Buyurtma muddati (expires_at) fon tekshiruvi ---
+    ORDER_EXPIRY_JOB_ENABLED: bool = True
+    ORDER_EXPIRY_INTERVAL_SECONDS: int = 300
+
     # --- Commission rates (UZS) ---
     COMMISSION_1_PAX: int = 5000
     COMMISSION_2_PAX: int = 8000

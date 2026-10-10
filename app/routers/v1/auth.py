@@ -8,11 +8,20 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserOut, OnboardingRequest
 from app.utils.telegram_auth import validate_telegram_init_data
+from app.utils.errors import api_error
 
 from app.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _init_data_error(exc: ValueError):
+    """InitData xatolarini spec bo'yicha kodlaydi (06_APISpec: 400/401)."""
+    msg = str(exc)
+    if "expired" in msg or "auth_date" in msg:
+        return api_error(401, msg, code="UNAUTHORIZED")
+    return api_error(400, msg, code="INVALID_INIT_DATA")
 
 
 class ValidateRequest(BaseModel):
@@ -33,7 +42,7 @@ async def validate_and_login(payload: ValidateRequest, db: AsyncSession = Depend
     try:
         tg_user = validate_telegram_init_data(payload.init_data)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _init_data_error(e)
 
     telegram_id = tg_user["id"]
 
@@ -83,7 +92,7 @@ async def complete_onboarding(
     try:
         tg_user = validate_telegram_init_data(init_data)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _init_data_error(e)
 
     result = await db.execute(select(User).where(User.telegram_id == tg_user["id"]))
     user = result.scalar_one_or_none()
@@ -92,7 +101,9 @@ async def complete_onboarding(
 
     user.language = payload.language
     user.theme = payload.theme
-    user.role = payload.role
+    # Admin roli faqat ADMIN_TELEGRAM_IDS orqali beriladi — onboarding uni tushirmaydi
+    if user.role != "admin":
+        user.role = payload.role
     user.working_cities = payload.working_cities
     user.is_onboarded = True
     await db.flush()

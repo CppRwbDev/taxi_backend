@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import time
 from urllib.parse import unquote, parse_qsl
 from app.config import settings
 
@@ -38,6 +39,18 @@ def validate_telegram_init_data(init_data: str) -> dict:
 
     if not hmac.compare_digest(computed_hash, hash_value):
         raise ValueError("Invalid Telegram initData hash")
+
+    # Replay himoyasi: initData qanchalik eski bo'lsa rad etiladi
+    auth_date = parsed.get("auth_date")
+    if not auth_date or not auth_date.isdigit():
+        raise ValueError("No auth_date in initData")
+
+    max_age = settings.INITDATA_MAX_AGE_SECONDS
+    age = int(time.time()) - int(auth_date)
+    if age > max_age:
+        raise ValueError(f"initData expired ({age}s > {max_age}s)")
+    if age < -300:  # kelajakdan kelgan sana
+        raise ValueError("Invalid auth_date in initData")
 
     # User ma'lumotlarini parse qilish
     user_data = parsed.get("user")

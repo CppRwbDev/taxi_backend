@@ -59,7 +59,11 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
 
-# Alembic uchun engine (migrations/env.py dan ishlatiladi)
-@property
-def engine():
+# Alembic uchun engine ham, /health tekshiruvi uchun ham ishlatiladi.
+# Eski versiyada @property module darajasida edi -> engine.connect() doim xato berardi.
+def get_sync_ready_engine():
     return get_engine()
+
+
+# Kelegi uchun nom (eski importlarni sindirmaslik uchun)
+engine = get_engine

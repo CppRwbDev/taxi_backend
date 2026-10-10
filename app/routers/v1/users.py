@@ -51,10 +51,24 @@ async def update_me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Profil va sozlamalarni yangilash."""
+    """Profil va sozlamalarni yangilash.
+
+    Xavfsizlik: faqat UserUpdate da e'lon qilingan (ruxsat etilgan) maydonlar
+    o'zgartiriladi — balance/is_active/is_verified/telegram_id kabi ichki
+    maydonlarni PATCH orqali yoza bo'lmaydi.
+    """
     update_data = payload.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="O'zgartirish uchun maydon yuborilmadi")
+
+    # Admin roli faqat Telegram ID orqali beriladi (auth.validate)
+    if update_data.get("role") and current_user.role == "admin":
+        update_data.pop("role")
+
+    allowed = set(UserUpdate.model_fields.keys())
     for field, value in update_data.items():
-        setattr(current_user, field, value)
+        if field in allowed:
+            setattr(current_user, field, value)
     await db.flush()
     logger.info("Profil yangilandi: user_id=%s fields=%s", current_user.id, list(update_data.keys()))
     return current_user

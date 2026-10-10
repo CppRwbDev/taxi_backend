@@ -1,8 +1,9 @@
 import logging
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from decimal import Decimal
 
 from app.database import get_db
 from app.models.user import User
@@ -29,17 +30,36 @@ async def get_stats(
     
     # Umumiy tushum (komissiya tranzaksiyalari yig'indisi)
     revenue_res = await db.execute(
-        select(func.sum(Transaction.amount))
-        .where(Transaction.type.in_(["offer_commission", "order_commission"]))
+        select(func.sum(Transaction.amount)).where(Transaction.type == "offer_commission")
     )
     total_revenue = revenue_res.scalar() or 0
     # Komissiya manfiy saqlangani uchun musbatga o'tkazamiz
     total_revenue = abs(float(total_revenue))
 
+    refund_res = await db.execute(
+        select(func.sum(Transaction.amount)).where(Transaction.type == "refund")
+    )
+    total_refunded = float(refund_res.scalar() or 0)
+
+    matched_count = await db.scalar(
+        select(func.count(Order.id)).where(Order.status == "matched")
+    )
+    completed_count = await db.scalar(
+        select(func.count(Order.id)).where(Order.status == "completed")
+    )
+    active_count = await db.scalar(
+        select(func.count(Order.id)).where(Order.status.in_(["searching", "has_offers"]))
+    )
+
     return {
         "users_count": users_count,
         "orders_count": orders_count,
-        "total_revenue": total_revenue
+        "orders_active": active_count,
+        "orders_matched": matched_count,
+        "orders_completed": completed_count,
+        "total_revenue": total_revenue,
+        "total_refunded": total_refunded,
+        "net_revenue": total_revenue - total_refunded,
     }
 
 @router.get("/users")
@@ -84,7 +104,49 @@ async def change_user_status(
     user = res.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
-    
+
     user.is_active = is_active
     await db.flush()
     return {"message": "Status o'zgartirildi", "is_active": is_active}
+
+
+class AdminTopUpRequest(BaseModel):
+    amount: Decimal
+    description: str = "Admin tomonidan to'ldirildi"
+
+
+@router.post("/balance/topup/{user_id}")
+async def admin_topup_balance(
+    user_id: int,
+    payload: AdminTopUpRequest,
+    admin: User = Depends(check_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """07_AdminPanel_TZ: POST /admin/balance/topup/{user_id} — admin manual top-up."""
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Summa 0 dan katta bo'lishi kerak")
+
+    res = await db.execute(select(User).where(User.id == user_id).with_for_update())
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+
+    user.balance = Decimal(user.balance) + payload.amount
+    db.add(
+        Transaction(
+            user_id=user.id,
+            amount=payload.amount,
+            type="top_up",
+            description=payload.description,
+            payment_provider="admin_manual",
+            payment_id=f"ADMIN-{admin.id}",
+            status="success",
+        )
+    )
+    await db.flush()
+    logger.info("Admin topup: user_id=%s amount=%s by=%s", user.id, payload.amount, admin.id)
+    return {
+        "message": "Balans to'ldirildi",
+        "user_id": user.id,
+        "new_balance": float(user.balance),
+    }

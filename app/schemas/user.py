@@ -19,15 +19,21 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
-    phone_number: Optional[str] = None
-    role: Optional[str] = None
-    language: Optional[str] = None
-    theme: Optional[str] = None
-    car_model: Optional[str] = None
-    car_number: Optional[str] = None
-    car_color: Optional[str] = None
-    working_cities: Optional[str] = None
+    """Profil yangilash uchun ruxsat etilgan maydonlar.
+
+    Ixtiyoriy (ichki/finans) maydonlar shu yerdan ataylab chetlab o'tiladi:
+    role, balance, is_active, is_verified, telegram_id, photo_url, is_onboarded.
+    """
+    full_name: Optional[str] = Field(None, max_length=200)
+    phone_number: Optional[str] = Field(None, max_length=30)
+    # "admin" rolini faqat ADMIN_TELEGRAM_IDS orqali berish mumkin (auth.py)
+    role: Optional[str] = Field(None, pattern="^(passenger|driver|investor)$")
+    language: Optional[str] = Field(None, pattern="^(uz_latn|uz_cyrl)$")
+    theme: Optional[str] = Field(None, pattern="^(dark|light)$")
+    car_model: Optional[str] = Field(None, max_length=100)
+    car_number: Optional[str] = Field(None, max_length=20)
+    car_color: Optional[str] = Field(None, max_length=50)
+    working_cities: Optional[str] = Field(None, max_length=500)
 
 
 class UserOut(UserBase):

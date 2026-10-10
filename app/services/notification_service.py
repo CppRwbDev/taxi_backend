@@ -4,27 +4,33 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-async def get_bot():
-    """aiogram bot instance ni olish."""
+def get_bot():
+    """Bot instance'ni qaytaradi (yagona, umumiy session).
+
+    Eski versiya har xabar uchun yangi Bot() yaratib, session'ni yopar edi.
+    """
+    if not settings.BOT_TOKEN:
+        return None
     try:
-        from aiogram import Bot
-        return Bot(token=settings.BOT_TOKEN)
-    except Exception as e:
-        logger.error("Bot instance yaratishda xato: %s", e)
+        from bot.main import bot as shared_bot
+        return shared_bot
+    except Exception as e:  # noqa: BLE001
+        logger.error("Bot instance olishda xato: %s", e)
         return None
 
 
-async def notify_drivers_group(order, passenger):
+async def notify_drivers_group(order, passenger) -> int | None:
     """
     Task 4.2 / Task 7.1 — Yangi buyurtmani haydovchilar guruhiga yuborish.
+    Qaytaradi: message_id (keyin guruh xabarini o'chirish/yangilash uchun).
     """
     if not settings.DRIVERS_GROUP_ID or not settings.BOT_TOKEN:
         logger.warning("BOT_TOKEN yoki DRIVERS_GROUP_ID sozlanmagan, notification o'tkazib yuborildi")
-        return
+        return None
 
-    bot = await get_bot()
+    bot = get_bot()
     if not bot:
-        return
+        return None
 
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     from app.config import get_commission
@@ -56,23 +62,12 @@ async def notify_drivers_group(order, passenger):
         )
         logger.info("Guruhga xabar yuborildi: message_id=%s order_id=%s", msg.message_id, order.id)
         return msg.message_id
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error("Guruhga xabar yuborishda xato: %s", e)
-    finally:
-        await bot.session.close()
+        return None
 
 
-async def notify_passenger_new_offer(offer, order, driver):
-    """
-    Task 7.2 — Yo'lovchiga yangi taklif kelgani haqida notification.
-    """
-    if not settings.BOT_TOKEN:
-        return
-
-    bot = await get_bot()
-    if not bot:
-        return
-
+async def _passenger_by_order(order):
     from sqlalchemy import select
     from app.database import get_session_factory
     from app.models.user import User
@@ -80,10 +75,19 @@ async def notify_passenger_new_offer(offer, order, driver):
     session_maker = get_session_factory()
     async with session_maker() as session:
         result = await session.execute(select(User).where(User.id == order.passenger_id))
-        passenger = result.scalar_one_or_none()
+        return result.scalar_one_or_none()
 
+
+async def notify_passenger_new_offer(offer, order, driver):
+    """
+    Task 7.2 — Yo'lovchiga yangi taklif kelgani haqida notification.
+    """
+    bot = get_bot()
+    if not bot:
+        return
+
+    passenger = await _passenger_by_order(order)
     if not passenger or not passenger.telegram_id:
-        await bot.session.close()
         return
 
     text = (
@@ -94,28 +98,22 @@ async def notify_passenger_new_offer(offer, order, driver):
         f"⏰ Joʻnash: {offer.proposed_time or 'Koʻrsatilmagan'}\n\n"
         f"📍 {order.from_location} → {order.to_location}"
     )
-    
+
     try:
         await bot.send_message(passenger.telegram_id, text, parse_mode="HTML")
-        logger.info("Yo'lovchiga taklif notification (offer_id=%s, tg_id=%s)", offer.id, passenger.telegram_id)
-    except Exception as e:
+        logger.info("Yo'lovchiga taklif notification (offer_id=%s tg_id=%s)", offer.id, passenger.telegram_id)
+    except Exception as e:  # noqa: BLE001
         logger.error("Yo'lovchiga xabar yuborishda xato: %s", e)
-    finally:
-        await bot.session.close()
 
 
 async def notify_match(order, driver, passenger):
     """
     Task 7.3 — Ikki tomonga match notification va kontaktlar ochilishi.
     """
-    if not settings.BOT_TOKEN:
-        return
-
-    bot = await get_bot()
+    bot = get_bot()
     if not bot:
         return
 
-    # Haydovchiga
     driver_text = (
         f"🎉 <b>Tabriklaymiz! Siz tanlangiz!</b>\n\n"
         f"👤 Yo'lovchi: <b>{passenger.full_name or 'Nomaʼlum'}</b>\n"
@@ -123,7 +121,6 @@ async def notify_match(order, driver, passenger):
         f"📍 {order.from_location} → {order.to_location}"
     )
 
-    # Yo'lovchiga
     passenger_text = (
         f"✅ <b>Haydovchi topildi!</b>\n\n"
         f"👤 Haydovchi: <b>{driver.full_name or 'Nomaʼlum'}</b>\n"
@@ -138,49 +135,105 @@ async def notify_match(order, driver, passenger):
         if passenger.telegram_id:
             await bot.send_message(passenger.telegram_id, passenger_text, parse_mode="HTML")
         logger.info("Match notification yuborildi: order_id=%s", order.id)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error("Match notification xatosi: %s", e)
-    finally:
-        await bot.session.close()
+
+
+async def notify_order_cancelled(order, closed_offers=None):
+    """Buyurtma bekor qilindi → guruh xabari o'chiriladi, haydovchilarga xabar ketadi."""
+    bot = get_bot()
+    if not bot:
+        return
+
+    # 1) Guruhdagi eski xabarni o'chirish (tugma ishlamay qolmasin)
+    if settings.DRIVERS_GROUP_ID and order.tg_group_message_id:
+        try:
+            await bot.delete_message(settings.DRIVERS_GROUP_ID, order.tg_group_message_id)
+            logger.info("Guruh xabari o'chirildi: %s", order.tg_group_message_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Guruh xabarini o'chirib bo'lmadi: %s", e)
+
+    # 2) Taklif yuborgan haydovchilarga shaxsiy xabar
+    driver_ids = {o.driver_id for o in (closed_offers or [])}
+    if not driver_ids:
+        return
+
+    from sqlalchemy import select
+    from app.database import get_session_factory
+    from app.models.user import User
+
+    session_maker = get_session_factory()
+    async with session_maker() as session:
+        result = await session.execute(select(User).where(User.id.in_(driver_ids)))
+        drivers = result.scalars().all()
+
+    text = (
+        f"❌ <b>Buyurtma bekor qilindi</b>\n\n"
+        f"📍 {order.from_location} → {order.to_location}\n"
+        f"💰 Komissiya hisobingizga qaytarildi."
+    )
+    for driver in drivers:
+        if not driver.telegram_id:
+            continue
+        try:
+            await bot.send_message(driver.telegram_id, text, parse_mode="HTML")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Cancel xatosi (user %s): %s", driver.id, e)
+
+    logger.info("Bekor qilish notification: order_id=%s haydovchilar=%s", order.id, len(driver_ids))
+
+
+async def notify_order_expired(order):
+    """Muddati o'tgan buyurtma haqida haydovchilarga xabar."""
+    bot = get_bot()
+    if not bot:
+        return
+    if settings.DRIVERS_GROUP_ID and order.tg_group_message_id:
+        try:
+            await bot.delete_message(settings.DRIVERS_GROUP_ID, order.tg_group_message_id)
+        except Exception:  # noqa: BLE001
+            pass
+    logger.info("Muddati o'tgan buyurtma yopildi: order_id=%s", order.id)
 
 
 async def notify_drivers_personally(order):
     """
     Yangi buyurtma haqida mos keluvchi hudud haydovchilariga shaxsiy xabar yuborish.
     """
-    if not settings.BOT_TOKEN:
-        return
-
-    bot = await get_bot()
+    bot = get_bot()
     if not bot:
         return
 
-    from sqlalchemy import select, or_
+    from sqlalchemy import select, or_, and_
     from app.database import get_session_factory
     from app.models.user import User
 
+    # working_cities: "Toshkent,Andijon" ko'rinishida → har bir shahar alohida tekshiriladi.
+    # order.from_location to'liq manzil bo'lgani uchun from_city/to_city ishlatiladi.
+    candidates: list[str] = []
+    for value in (order.from_city, order.to_city, order.from_location, order.to_location):
+        if value:
+            candidates.append(value.strip())
+
+    if not candidates:
+        return
+
+    conditions = []
+    for value in candidates:
+        conditions.append(User.working_cities.ilike(f"%{value}%"))
+
     session_maker = get_session_factory()
     async with session_maker() as session:
-        # Hududi mos va aktiv haydovchilarni qidirish
-        # working_cities "Toshkent,Andijon" ko'rinishida, shuning uchun LIKE operatoridan foydalanamiz
-        search_from = f"%{order.from_location}%"
-        search_to = f"%{order.to_location}%"
-        
         result = await session.execute(
-            select(User)
-            .where(
+            select(User).where(
                 User.role.in_(["driver", "investor"]),
-                User.is_active == True,
-                or_(
-                    User.working_cities.ilike(search_from),
-                    User.working_cities.ilike(search_to)
-                )
+                User.is_active.is_(True),
+                or_(*conditions),
             )
         )
         drivers = result.scalars().all()
 
     if not drivers:
-        await bot.session.close()
         return
 
     text = (
@@ -196,7 +249,5 @@ async def notify_drivers_personally(order):
             continue
         try:
             await bot.send_message(driver.telegram_id, text, parse_mode="HTML")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning("Driver serial notification error for user %s: %s", driver.id, e)
-
-    await bot.session.close()

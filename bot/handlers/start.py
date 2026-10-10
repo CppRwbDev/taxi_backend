@@ -9,7 +9,11 @@ from app.models.user import User
 router = Router()
 
 
-def _webapp_keyboard(url: str) -> InlineKeyboardMarkup:
+def _webapp_keyboard(url: str | None) -> InlineKeyboardMarkup | None:
+    """WebApp tugmasi. Telegram faqat https:// URL'ni qabul qiladi
+    (aksi holda BUTTON_TYPE_INVALID). URL yo'q yoki http bo'lsa — None."""
+    if not url or not url.startswith("https://"):
+        return None
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
@@ -76,6 +80,11 @@ async def _send_welcome(message: types.Message, payload: str | None = None):
             "Pastdagi tugma orqali ilovani ochishingiz mumkin."
         )
         keyboard = _webapp_keyboard(web_app_url)
+
+    # https havola sozlanmagan bo'lsa (yoki foydalanuvchi bloklangan)
+    # bot qulamasligi uchun matn qaytaramiz, reply_markup=None
+    if keyboard is None and user is not None and user.is_active:
+        text += "\n\n⚠️ Web ilova havolasi hozircha sozlanmagan. Administratorga murojaat qiling."
 
     await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
